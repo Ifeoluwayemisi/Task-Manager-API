@@ -1,0 +1,32 @@
+{
+  "name": "task-manager-api",
+  "version": "1.0.0",
+  "description": "A task manager API",
+  "homepage": "https://github.com/Ifeoluwayemisi/Task-Manager-API#readme",
+  "bugs": {
+    "url": "https://github.com/Ifeoluwayemisi/Task-Manager-API/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ifeoluwayemisi/Task-Manager-API.git"
+  },
+  "license": "ISC",
+  "author": "Racheal",
+  "type": "module",
+  "main": "app.js",
+  "scripts": {
+    "start": "node se"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.14.1",
+    "nodemailer": "^7.0.3",
+    "sequelize": "^6.37.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
