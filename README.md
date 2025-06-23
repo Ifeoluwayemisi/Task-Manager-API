@@ -23,10 +23,12 @@ A simple task management backend API built with **Node.js**, **Express**, and **
 ## 🌐 API Endpoints
 
 ### 🔐 Auth
-| Method | Endpoint              | Description     |
-|--------|-----------------------|-----------------|
-| POST   | `/api/auth/register`  | Register user   |
-| POST   | `/api/auth/login`     | Login user      |
+| Method |       Endpoint             |     Description           |
+|--------|----------------------------|---------------------------|
+| POST   | `/api/auth/register`       | Register user             |
+| POST   | `/api/auth/login`          | Login user                |
+| POST   | `/api/auth/forgot-password`| Send password reset email |
+| POST   | `/api/auth/reset-password` | Reset password via token  |
 
 ### 📋 Tasks (Requires JWT in `Authorization` header)
 | Method | Endpoint           | Description        |
