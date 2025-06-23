@@ -4,20 +4,20 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL.USER,
-        pass: process.env.EMAIL.PASS,
-    },
+  service: 'gmail', // Or use process.env.EMAIL_HOST if not Gmail
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
 });
 
 const sendEmail = async (to, subject, text) => {
-    await transporter.sendEmail({
-        from: `"Chelle Task Manager" <${process.env.EMAIL_USER}>`,
-        to,
-        subject,
-        text,
-    });
+  await transporter.sendMail({
+    from: `"Chelle Task Manager" <${process.env.EMAIL_USER}>`,
+    to,
+    subject,
+    text,
+  });
 };
 
-export default sendEmail
+export default sendEmail;
