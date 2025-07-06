@@ -7,7 +7,7 @@ import nodemailer from 'nodemailer';
 export const register = async (req, res) => {
     const {email, password} = req.body;
     try{
-        const hashed = await bcrypt.hash(password, 10);
+        const hashed = await bcrypt.hash(password, 8);
         const user = await User.create({ email, password:hashed});
     } catch (err) {
          console.error(err);
@@ -44,7 +44,7 @@ export const forgotPassword = async (req, res) => {
     const user = await User.findOne({ where: { email } });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '15m' });
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '30m' });
     const resetLink = `http://localhost:5000/reset-password?token=${token}`;
 
     // Try to send the email
@@ -92,7 +92,7 @@ export const resetPassword = async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     // Hash the new password and save
-    const hashed = await bcrypt.hash(newPassword, 10);
+    const hashed = await bcrypt.hash(newPassword, 8);
     user.password = hashed;
     await user.save();
 
@@ -100,5 +100,64 @@ export const resetPassword = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(400).json({ message: 'Invalid or expired token.' });
+  }
+};
+
+export const getProfile = async (req, res) => {
+  try{
+    const user = await User.findByPk(req.user.id, {
+      attributes: ['id', 'email', 'avatar', 'createdAt', 'updatedAt']
+    });
+    res.status(200).json(user);
+  } catch (err) {
+    res.status(500).json({message: 'Failed to load profile'});
+  }
+};
+
+export const updateProfile = async (req, res) => {
+  const {email, password} = req.body;
+  const avatar = req.file?.filename;
+
+  try {
+    const user = await User.findByPk(req.user.id);
+
+    if (email && email !== user.email) {
+      const exists = await User.findOne({where: {email}});
+      if (exists) return res.status(400).json({message: 'Email already in use'});
+      user.email = email; 
+    }
+    if (password) {
+      const hashed = await bcrypt.hash(password, 8);
+      user.password = hashed;
+    }
+
+    if (avatar) {
+      user.avatar = '/uploads/profile-pics/${avatar}';
+    }
+
+    await user.save();
+
+    // to issue new token if email was updated 
+    const token = jwt.sign(
+      {
+        id: user.id, email:user.email
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: 
+        process.env.JWT_EXPIRES_IN || 'id'
+      }
+    );
+
+    res.status(200).json({message: 'Prrofile updated sucessfully', 
+      token,
+      user: {
+        id: user.id,
+        email:user.email,
+        avatar: user.avatar,
+      }
+    });
+  } catch (err) {
+    res.status(500).json({message:'Failed to update profile', error: err.message});
   }
 };
