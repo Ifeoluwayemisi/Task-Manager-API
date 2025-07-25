@@ -1,7 +1,7 @@
 // models/index.js
 import Sequelize from 'sequelize';
 import User from './user.js';
-import Task from './task.js'; // if you have it
+import Task from './task.js';
 
 const sequelize = new Sequelize(
   process.env.DB_NAME,
@@ -14,18 +14,19 @@ const sequelize = new Sequelize(
   }
 );
 
+// Initialize models
 User.initModel(sequelize);
 Task.initModel(sequelize);
 
-/* const db = {};
-db.sequelize = sequelize;
-db.Sequelize = Sequelize;
-
-db.User = User(sequelize);
-db.Task = Task(sequelize); */
-
-//Relationship
+// Define associations
 User.hasMany(Task, { foreignKey: 'userId', onDelete: 'CASCADE' });
 Task.belongsTo(User, { foreignKey: 'userId' });
 
-export default {sequelize, User, Task};
+const db = {
+  sequelize,
+  Sequelize,
+  User,
+  Task
+};
+
+export default db;

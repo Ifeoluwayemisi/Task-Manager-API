@@ -1,53 +1,61 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import User from '../models/index.js';
 import nodemailer from 'nodemailer';
+import dotenv from 'dotenv';
+import models from '../models/index.js';
 
+dotenv.config();
+const { User } = models;
 
+// Generate JWTtoken
+const generateToken = (payload, expiresIn = process.env.JWT_EXPIRES_IN || '1d') =>
+  jwt.sign(payload, process.env.JWT_SECRET, { expiresIn });
+
+//  REGISTER 
 export const register = async (req, res) => {
-    const {email, password} = req.body;
-    try{
-        const hashed = await bcrypt.hash(password, 8);
-        const user = await User.create({ email, password:hashed});
-    } catch (err) {
-         console.error(err);
-         res.status(400).json({ error: err.message || "Something went wrong" });
-    }
+  const { email, password } = req.body;
+  try {
+    const hashed = await bcrypt.hash(password, 8);
+    const newUser = await User.create({ email, password: hashed });
+
+    const token = generateToken({ id: newUser.id, email: newUser.email });
+
+    res.status(201).json({ message: 'User registered successfully', token });
+  } catch (err) {
+    console.error('Register error:', err);
+    res.status(400).json({ error: err.message || 'Registration failed' });
+  }
 };
 
+// LOGIN
 export const login = async (req, res) => {
-    const {email, password} = req.body;
-    try{
-        const user = await User.findOne({where: {email}});
-        if(!user) return res.status(404).json({message: 'User NOT Found'});
-            
-            const valid = await bcrypt.compare(password, user.password);
-            if(!valid) return res.status(401).json({message:'Invalid Password!'});
-
-            const token = jwt.sign({id: user.id, email:user.email}, process.env.JWT_SECRET);
-            res.json({token});
-    }  catch (err) {
-        res.status(400).json({error: err.message});
-    }
-
-    console.log("Incoming password:", password);
-    console.log("User hashed password:", user.password);
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    console.log("Password match:", isMatch);
-};
-
-export const forgotPassword = async (req, res) => {
-  const { email } = req.body;
-
+  const { email, password } = req.body;
   try {
     const user = await User.findOne({ where: { email } });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '30m' });
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) return res.status(401).json({ message: 'Invalid password' });
+
+    const token = generateToken({ id: user.id, email: user.email });
+
+    res.json({ message: 'Login successful', token });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(400).json({ error: err.message || 'Login failed' });
+  }
+};
+
+//  FORGOT PASSWORD
+export const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  try {
+    const user = await User.findOne({ where: { email } });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const token = generateToken({ id: user.id }, '30m');
     const resetLink = `http://localhost:5000/reset-password?token=${token}`;
 
-    // Try to send the email
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -67,123 +75,117 @@ export const forgotPassword = async (req, res) => {
       await transporter.sendMail(mailOptions);
       res.status(200).json({ message: 'Reset link sent to your email.' });
     } catch (emailErr) {
-      console.warn('Email failed. Logging reset link instead.');
-      console.log('Reset link:', resetLink);
+      console.warn('Email failed:', emailErr.message);
       res.status(200).json({
-        message: 'Email failed to send. Reset link has been logged instead (dev mode).',
+        message: 'Reset link email failed. Showing link in dev mode.',
         link: resetLink,
       });
     }
   } catch (err) {
-    console.error(err);
+    console.error('Forgot password error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
+//  RESET PASSWORD
 export const resetPassword = async (req, res) => {
   const { token, newPassword } = req.body;
 
   try {
-    // Verify the token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    // Find the user by ID from token
     const user = await User.findByPk(decoded.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Hash the new password and save
     const hashed = await bcrypt.hash(newPassword, 8);
     user.password = hashed;
     await user.save();
 
-    res.status(200).json({ message: 'Password updated successfully.' });
+    res.status(200).json({ message: 'Password updated successfully' });
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ message: 'Invalid or expired token.' });
+    console.error('Reset password error:', err);
+    res.status(400).json({ message: 'Invalid or expired token' });
   }
 };
 
+//  GET PROFILE
 export const getProfile = async (req, res) => {
-  try{
+  try {
     const user = await User.findByPk(req.user.id, {
-      attributes: ['id', 'email', 'avatar', 'createdAt', 'updatedAt']
+      attributes: ['id', 'email', 'avatar', 'createdAt', 'updatedAt'],
     });
+    if (!user) return res.status(404).json({ message: 'User not found' });
     res.status(200).json(user);
   } catch (err) {
-    res.status(500).json({message: 'Failed to load profile'});
+    console.error('Get profile error:', err);
+    res.status(500).json({ message: 'Failed to load profile' });
   }
 };
 
+//  UPDATE PROFILE 
 export const updateProfile = async (req, res) => {
-  const {email, password} = req.body;
+  const { email, password } = req.body;
   const avatar = req.file?.filename;
 
   try {
     const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
     if (email && email !== user.email) {
-      const exists = await User.findOne({where: {email}});
-      if (exists) return res.status(400).json({message: 'Email already in use'});
-      user.email = email; 
+      const exists = await User.findOne({ where: { email } });
+      if (exists) return res.status(400).json({ message: 'Email already in use' });
+      user.email = email;
     }
+
     if (password) {
       const hashed = await bcrypt.hash(password, 8);
       user.password = hashed;
     }
 
     if (avatar) {
-      user.avatar = '/uploads/profile-pics/${avatar}';
+      user.avatar = `/uploads/profile-pics/${avatar}`;
     }
 
     await user.save();
 
-    // to issue new token if email was updated 
-    const token = jwt.sign(
-      {
-        id: user.id, email:user.email
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: 
-        process.env.JWT_EXPIRES_IN || 'id'
-      }
-    );
+    const token = generateToken({ id: user.id, email: user.email });
 
-    res.status(200).json({message: 'Prrofile updated sucessfully', 
+    res.status(200).json({
+      message: 'Profile updated successfully',
       token,
       user: {
         id: user.id,
-        email:user.email,
+        email: user.email,
         avatar: user.avatar,
-      }
+      },
     });
   } catch (err) {
-    res.status(500).json({message:'Failed to update profile', error: err.message});
+    console.error('Update profile error:', err);
+    res.status(500).json({ message: 'Failed to update profile', error: err.message });
   }
 };
 
+//  DELETE USER
 export const deleteUserWithConfirmation = async (req, res) => {
-  const {confirm} = req.body;
+  const { confirm } = req.body;
 
   if (confirm !== 'DELETE') {
     return res.status(400).json({
-      message: 'Please confirm account deletion by sending {"confirm": "DELETE"}'
+      message: 'Please confirm account deletion by sending { "confirm": "DELETE" }',
     });
   }
 
   try {
-    const user = await
-    User.findByPk(req.user.id);
-    if (!user) return
-    res.status(404).json({message: 'User not found'});
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
     await user.destroy();
 
     res.status(200).json({
-      message: 'User and associated tasks deleted. Please log out.',
-      token: null
+      message: 'User and associated tasks deleted successfully',
+      token: null,
     });
-  } catch (error) {
-    res.status(500).json({message: 'Failed to delete user', error: error.message});
+  } catch (err) {
+    console.error('Delete user error:', err);
+    res.status(500).json({ message: 'Failed to delete user', error: err.message });
   }
 };
