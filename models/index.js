@@ -2,6 +2,8 @@
 import Sequelize from 'sequelize';
 import User from './user.js';
 import Task from './task.js';
+import dotenv from 'dotenv';
+dotenv.config();
 
 const sequelize = new Sequelize(
   process.env.DB_NAME,

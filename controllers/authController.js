@@ -48,6 +48,9 @@ export const login = async (req, res) => {
 
 //  FORGOT PASSWORD
 export const forgotPassword = async (req, res) => {
+  if (!req.body || !req.body.email) {
+    return res.status(400).json({ message: 'Email is required' });
+  }
   const { email } = req.body;
   try {
     const user = await User.findOne({ where: { email } });
@@ -89,17 +92,34 @@ export const forgotPassword = async (req, res) => {
 
 //  RESET PASSWORD
 export const resetPassword = async (req, res) => {
-  const { token, newPassword } = req.body;
+  const { newPassword } = req.body;
+  const { token } = req.query;
+
+  if (!token || !newPassword) {
+    return res.status(400).json({ message: 'Token and new password are required' });
+  }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findByPk(decoded.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user || user.resetToken !==token) return res.status(401).json({ message: 'Invalid or expired token' });
 
     const hashed = await bcrypt.hash(newPassword, 8);
     user.password = hashed;
+    user.resetToken = null; // Clear reset token after use
     await user.save();
 
+    //auto-login
+    const newAuthToken = generateToken({ id: user.id, email: user.email }, '1h');
+    return res.status(200).json({
+      message: 'Password reset successfully',
+      token: newAuthToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        avatar: user.avatar,
+      },
+    });
     res.status(200).json({ message: 'Password updated successfully' });
   } catch (err) {
     console.error('Reset password error:', err);

@@ -1,6 +1,7 @@
 import db from '../models/index.js';
 import sendEmail from '../utils/sendEmail.js'; // Assuming you have this
 const { Task, User } = db;
+import { Op } from 'sequelize';
 
 // Create a new task
 export const createTask = async (req, res) => {
@@ -27,7 +28,7 @@ export const createTask = async (req, res) => {
 };
 
 // Get all tasks for logged-in user
-export const getUserTasks = async (req, res) => {
+export const getTasks = async (req, res) => {
   try {
     const tasks = await Task.findAll({
       where: { userId: req.user.id },
@@ -105,7 +106,11 @@ export const deleteTask = async (req, res) => {
 export const getTrashedTasks = async (req, res) => {
   try {
     const trashedTasks = await Task.findAll({
-      where: { userId: req.user.id },
+      where: { userId: req.user.id,
+        deletedAt: {
+            [Op.not]: null
+        }
+       },
       paranoid: false,
     });
 
@@ -117,6 +122,27 @@ export const getTrashedTasks = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+export const restoreTask = async (req, res) => {
+    try {
+        const task = await Task.findOne({
+        where: {
+            id: req.params.id,
+            userId: req.user.id,
+        },
+        paranoid: false, // Allow fetching soft-deleted tasks
+        });
+    
+        if (!task) return res.status(404).json({ message: 'Task not found' });
+    
+        await task.restore(); // Restore the soft-deleted task
+    
+        res.status(200).json({ message: 'Task restored successfully', task });
+    } catch (err) {
+        console.error('Error restoring task:', err.message);
+        res.status(500).json({ message: 'Server error' });
+    }
+}
 
 // Permanently delete a task
 export const hardDeleteTask = async (req, res) => {
